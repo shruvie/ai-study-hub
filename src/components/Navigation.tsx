@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Menu, X, Sparkles } from "lucide-react";
 
@@ -37,7 +38,7 @@ const Navigation = () => {
               <Sparkles className="w-5 h-5 text-primary-foreground" />
             </div>
             <span className="text-xl font-bold text-foreground">
-              Learn<span className="gradient-text">AI</span>
+              StudySphere <span className="gradient-text">AI</span>
             </span>
           </a>
 
@@ -56,9 +57,11 @@ const Navigation = () => {
 
           {/* CTA Button */}
           <div className="hidden md:block">
-            <Button variant="hero" size="default">
-              Try the Demo
-            </Button>
+            <Link to="/demo">
+              <Button variant="hero" size="default">
+                Try the Demo
+              </Button>
+            </Link>
           </div>
 
           {/* Mobile Menu Button */}
@@ -84,9 +87,11 @@ const Navigation = () => {
                   {link.label}
                 </a>
               ))}
-              <Button variant="hero" size="default" className="mt-2">
-                Try the Demo
-              </Button>
+              <Link to="/demo" onClick={() => setIsMobileMenuOpen(false)}>
+                <Button variant="hero" size="default" className="mt-2 w-full">
+                  Try the Demo
+                </Button>
+              </Link>
             </div>
           </div>
         )}
