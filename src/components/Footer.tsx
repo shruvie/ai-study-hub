@@ -35,12 +35,12 @@ const Footer = () => {
       <div className="container-tight py-16">
         <div className="grid md:grid-cols-2 lg:grid-cols-5 gap-12 mb-12">
           {/* Brand */}
-          <div className="lg:col-span-2">
+        <div className="lg:col-span-2">
             <a href="#" className="flex items-center gap-2 mb-4">
               <div className="w-9 h-9 rounded-xl gradient-primary flex items-center justify-center">
                 <Sparkles className="w-5 h-5 text-primary-foreground" />
               </div>
-              <span className="text-xl font-bold">LearnAI</span>
+              <span className="text-xl font-bold">StudySphere AI</span>
             </a>
             <p className="text-background/70 mb-6 max-w-sm leading-relaxed">
               Your personal AI study companion. Adaptive learning, personalized study paths, and intelligent note understanding.
@@ -112,7 +112,7 @@ const Footer = () => {
         {/* Bottom */}
         <div className="pt-8 border-t border-background/10 flex flex-col md:flex-row justify-between items-center gap-4">
           <p className="text-background/50 text-sm">
-            © {currentYear} LearnAI. All rights reserved.
+            © {currentYear} StudySphere AI. All rights reserved.
           </p>
           <p className="text-background/50 text-sm">
             Built with ❤️ for students everywhere
