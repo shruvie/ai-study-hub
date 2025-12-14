@@ -112,7 +112,7 @@ const Footer = () => {
         {/* Bottom */}
         <div className="pt-8 border-t border-background/10 flex flex-col md:flex-row justify-between items-center gap-4">
           <p className="text-background/50 text-sm">
-            © {currentYear} StudySphere AI. All rights reserved.
+            @Built by SynaptiX
           </p>
           <p className="text-background/50 text-sm">
             Built with ❤️ for students everywhere
