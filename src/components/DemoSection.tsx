@@ -1,22 +1,5 @@
 import { Play, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useRef } from 'react';
-
-// ... inside your component
-const fileInputRef = useRef(null);
-
-const handleButtonClick = () => {
-  // This triggers the hidden input's click event
-  fileInputRef.current.click();
-};
-
-const handleFileChange = (event) => {
-  const file = event.target.files[0];
-  if (file) {
-    console.log("Selected file:", file.name);
-    // You can now upload 'file' to your server/S3/Firebase
-  }
-};
 
 const DemoSection = () => {
   return (
@@ -59,14 +42,6 @@ const DemoSection = () => {
               </p>
 
               <div className="flex flex-col sm:flex-row gap-3">
-                {/* Hidden File Input */}
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  onChange={handleFileChange}
-                  style={{ display: 'none' }}
-                  // Optional: accept=".mp3,.wav" for demos
-                  />
                 <Button variant="hero" size="lg">
                   <Play className="w-5 h-5" />
                   Get Notified
