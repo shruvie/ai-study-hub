@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -11,11 +12,54 @@ serve(async (req) => {
   }
 
   try {
+    // Verify JWT token
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: 'Missing authorization header' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
+    if (authError || !user) {
+      console.error('Auth error:', authError);
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log('Authenticated user:', user.id);
+
     const { content, contentType } = await req.json();
     
+    // Input validation
     if (!content) {
       return new Response(
         JSON.stringify({ error: 'Content is required' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Validate content length (max 50KB)
+    if (content.length > 50000) {
+      return new Response(
+        JSON.stringify({ error: 'Content too large. Maximum 50KB allowed.' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Validate content type
+    if (contentType && !['file', 'url'].includes(contentType)) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid content type' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -25,7 +69,7 @@ serve(async (req) => {
       throw new Error('LOVABLE_API_KEY is not configured');
     }
 
-    console.log('Processing content of type:', contentType);
+    console.log('Processing content of type:', contentType, 'for user:', user.id);
 
     // Generate all outputs in parallel using the AI
     const systemPrompt = `You are an educational content analyzer. Given the following content, generate structured learning materials.
@@ -89,7 +133,7 @@ Make flashcards cover key vocabulary and concepts.`;
       throw new Error('Failed to parse AI response as JSON');
     }
 
-    console.log('Successfully generated learning materials');
+    console.log('Successfully generated learning materials for user:', user.id);
 
     return new Response(
       JSON.stringify({
