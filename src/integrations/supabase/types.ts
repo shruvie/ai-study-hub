@@ -121,6 +121,14 @@ export type Database = {
         Args: { lookup_email: string }
         Returns: string
       }
+      user_has_notebook_permission: {
+        Args: { p_notebook_id: string; p_user_id: string }
+        Returns: boolean
+      }
+      user_is_notebook_editor: {
+        Args: { p_notebook_id: string; p_user_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       permission_role: "viewer" | "editor"
