@@ -1,1 +1,10 @@
 project_id = "iqachdervizkcibujsqi"
+
+[functions.process-content]
+verify_jwt = true
+
+[functions.text-to-speech]
+verify_jwt = true
+
+[functions.chat-with-sources]
+verify_jwt = true
