@@ -95,16 +95,13 @@ export function ShareModal({ open, onOpenChange, notebookId, notebookTitle, onSh
 
     setLoading(true);
     try {
-      // Find user by email in profiles
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('user_id')
-        .eq('email', email.toLowerCase())
-        .maybeSingle();
+      // Use the secure RPC function to look up user by email
+      const { data: userId, error: lookupError } = await supabase
+        .rpc('lookup_user_id_by_email', { lookup_email: email.toLowerCase() });
 
-      if (profileError) throw profileError;
+      if (lookupError) throw lookupError;
 
-      if (!profile) {
+      if (!userId) {
         toast.error('No user found with that email address');
         setLoading(false);
         return;
@@ -115,7 +112,7 @@ export function ShareModal({ open, onOpenChange, notebookId, notebookTitle, onSh
         .from('notebook_permissions')
         .select('id')
         .eq('notebook_id', notebookId)
-        .eq('user_id', profile.user_id)
+        .eq('user_id', userId)
         .maybeSingle();
 
       if (existing) {
@@ -133,7 +130,7 @@ export function ShareModal({ open, onOpenChange, notebookId, notebookTitle, onSh
           .from('notebook_permissions')
           .insert({
             notebook_id: notebookId,
-            user_id: profile.user_id,
+            user_id: userId,
             role
           });
 

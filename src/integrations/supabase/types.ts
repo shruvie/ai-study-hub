@@ -117,7 +117,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      lookup_user_id_by_email: {
+        Args: { lookup_email: string }
+        Returns: string
+      }
     }
     Enums: {
       permission_role: "viewer" | "editor"
