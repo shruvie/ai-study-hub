@@ -1,52 +1,108 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { 
-  Plus, 
-  Upload, 
-  Search, 
-  Globe, 
-  Zap, 
-  ArrowRight,
+  ChevronLeft,
   Sparkles,
   Settings,
   Share2,
-  Grid3X3,
-  FileText,
+  Network,
   Headphones,
   Video,
-  Network,
-  FileBarChart,
-  LayoutGrid,
   HelpCircle,
-  Presentation,
-  StickyNote,
-  ChevronLeft
+  Layers,
+  Loader2,
+  AlertCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import FileUploadZone from "@/components/demo/FileUploadZone";
+import MindmapView from "@/components/demo/MindmapView";
+import AudioPlayer from "@/components/demo/AudioPlayer";
+import VideoOverview from "@/components/demo/VideoOverview";
+import QuizView from "@/components/demo/QuizView";
+import FlashcardsView from "@/components/demo/FlashcardsView";
+
+interface ProcessedData {
+  mindmap: string;
+  audioScript: string;
+  videoOutline: { title: string; content: string }[];
+  quiz: { question: string; options: string[]; correctIndex: number }[];
+  flashcards: { front: string; back: string }[];
+}
 
 const Demo = () => {
   const [notebookTitle, setNotebookTitle] = useState("Untitled notebook");
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [hasResults, setHasResults] = useState(false);
+  const [activeTab, setActiveTab] = useState("mindmap");
+  const [processedData, setProcessedData] = useState<ProcessedData | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
 
-  const studioFeatures = [
-    { icon: Headphones, label: "Audio Overview" },
-    { icon: Video, label: "Video Overview" },
-    { icon: Network, label: "Mind Map" },
-    { icon: FileBarChart, label: "Reports" },
-    { icon: LayoutGrid, label: "Flashcards" },
-    { icon: HelpCircle, label: "Quiz" },
-    { icon: FileText, label: "Infographic" },
-    { icon: Presentation, label: "Slide deck" },
+  const handleProcess = async (content: string, type: 'file' | 'url') => {
+    setIsProcessing(true);
+    setError(null);
+    
+    try {
+      let textContent = content;
+      
+      // If URL, we'll pass it to the backend for processing
+      if (type === 'url') {
+        textContent = `Please analyze the content from this URL: ${content}. Extract key concepts, create educational materials, and generate study aids based on typical content from such a source.`;
+      }
+
+      const { data, error: fnError } = await supabase.functions.invoke('process-content', {
+        body: { content: textContent, contentType: type }
+      });
+
+      if (fnError) {
+        throw new Error(fnError.message);
+      }
+
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to process content');
+      }
+
+      setProcessedData(data.data);
+      setHasResults(true);
+      setActiveTab("mindmap");
+      
+      toast({
+        title: "Content Processed!",
+        description: "Your learning materials are ready.",
+      });
+    } catch (err) {
+      console.error('Processing error:', err);
+      const message = err instanceof Error ? err.message : 'Failed to process content';
+      setError(message);
+      toast({
+        title: "Processing Failed",
+        description: message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const tabItems = [
+    { id: "mindmap", label: "Mindmap", icon: Network },
+    { id: "audio", label: "Audio", icon: Headphones },
+    { id: "video", label: "Video", icon: Video },
+    { id: "quiz", label: "Quiz", icon: HelpCircle },
+    { id: "flashcards", label: "Cards", icon: Layers },
   ];
 
   return (
-    <div className="min-h-screen bg-[#1a1a1a] text-white">
+    <div className="min-h-screen bg-[#0a0a0f] text-white">
       {/* Header */}
-      <header className="flex items-center justify-between px-4 py-3 border-b border-white/10">
+      <header className="flex items-center justify-between px-4 py-3 border-b border-white/10 bg-[#0a0a0f]/80 backdrop-blur-lg sticky top-0 z-50">
         <div className="flex items-center gap-4">
           <Link to="/" className="flex items-center gap-2 text-white/70 hover:text-white transition-colors">
             <ChevronLeft className="w-5 h-5" />
-            <span className="text-sm">Back</span>
+            <span className="text-sm hidden sm:inline">Back</span>
           </Link>
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-full gradient-primary flex items-center justify-center">
@@ -56,199 +112,144 @@ const Demo = () => {
               type="text"
               value={notebookTitle}
               onChange={(e) => setNotebookTitle(e.target.value)}
-              className="bg-transparent text-lg font-medium focus:outline-none border-b border-transparent hover:border-white/20 focus:border-primary transition-colors"
+              className="bg-transparent text-lg font-medium focus:outline-none border-b border-transparent hover:border-white/20 focus:border-primary transition-colors max-w-[200px] sm:max-w-none"
             />
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Button className="bg-primary hover:bg-primary/90 text-white gap-2">
-            <Plus className="w-4 h-4" />
-            Create notebook
-          </Button>
-          <Button variant="ghost" className="text-white/70 hover:text-white hover:bg-white/10 gap-2">
+          <Button variant="ghost" size="icon" className="text-white/70 hover:text-white hover:bg-white/10">
             <Share2 className="w-4 h-4" />
-            Share
-          </Button>
-          <Button variant="ghost" className="text-white/70 hover:text-white hover:bg-white/10 gap-2">
-            <Settings className="w-4 h-4" />
-            Settings
           </Button>
           <Button variant="ghost" size="icon" className="text-white/70 hover:text-white hover:bg-white/10">
-            <Grid3X3 className="w-5 h-5" />
+            <Settings className="w-4 h-4" />
           </Button>
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-orange-400 to-pink-500" />
+          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-accent" />
         </div>
       </header>
 
-      {/* Main Content */}
-      <div className="flex h-[calc(100vh-57px)]">
-        {/* Sources Panel */}
-        <div className="w-[360px] border-r border-white/10 flex flex-col">
-          <div className="p-4 flex items-center justify-between">
-            <h2 className="text-lg font-medium">Sources</h2>
-            <Button variant="ghost" size="icon" className="text-white/50 hover:text-white hover:bg-white/10">
-              <FileText className="w-4 h-4" />
-            </Button>
-          </div>
-          
-          {/* Add Sources Button */}
-          <div className="px-4 mb-4">
-            <Button className="w-full bg-white/10 hover:bg-white/15 text-white border border-white/20 gap-2">
-              <Plus className="w-4 h-4" />
-              Add sources
-            </Button>
-          </div>
-
-          {/* Deep Research */}
-          <div className="mx-4 p-3 rounded-xl bg-gradient-to-r from-emerald-900/50 to-teal-900/50 border border-emerald-500/30 mb-4">
-            <div className="flex items-start gap-3">
-              <div className="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center flex-shrink-0">
-                <Zap className="w-4 h-4 text-white" />
-              </div>
-              <div>
-                <p className="text-sm">
-                  <span className="text-emerald-400 font-medium cursor-pointer hover:underline">Try Deep Research</span>
-                  {" "}for an in-depth report and new sources!
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Search */}
-          <div className="px-4 mb-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/50" />
-              <Input 
-                placeholder="Search the web for new sources"
-                className="pl-10 bg-white/5 border-white/10 text-white placeholder:text-white/50 focus:border-primary"
-              />
-            </div>
-          </div>
-
-          {/* Filter Buttons */}
-          <div className="px-4 mb-6 flex items-center gap-2">
-            <Button variant="outline" size="sm" className="bg-white/10 border-white/20 text-white hover:bg-white/15 gap-2">
-              <Globe className="w-4 h-4" />
-              Web
-            </Button>
-            <Button variant="outline" size="sm" className="bg-white/10 border-white/20 text-white hover:bg-white/15 gap-2">
-              <Zap className="w-4 h-4" />
-              Fast research
-            </Button>
-            <Button size="icon" variant="ghost" className="text-white/50 hover:text-white hover:bg-white/10">
-              <ArrowRight className="w-4 h-4" />
-            </Button>
-          </div>
-
-          {/* Empty State */}
-          <div className="flex-1 flex flex-col items-center justify-center px-4 text-center">
-            <div className="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center mb-4">
-              <FileText className="w-6 h-6 text-white/30" />
-            </div>
-            <h3 className="font-medium text-white/90 mb-2">Saved sources will appear here</h3>
-            <p className="text-sm text-white/50 leading-relaxed">
-              Click Add source above to add PDFs, websites, text, videos or audio files. Or import a file directly from Google Drive.
+      {/* Main Content - Split Screen */}
+      <div className="flex flex-col lg:flex-row h-[calc(100vh-57px)]">
+        {/* Left Panel - Upload Area */}
+        <div className="w-full lg:w-[400px] xl:w-[450px] border-b lg:border-b-0 lg:border-r border-white/10 flex flex-col p-6 overflow-auto">
+          <div className="mb-6">
+            <h2 className="text-xl font-semibold text-white mb-2">Resource Upload</h2>
+            <p className="text-white/50 text-sm">
+              Upload documents or paste URLs to generate AI-powered learning materials
             </p>
           </div>
-        </div>
 
-        {/* Chat Panel */}
-        <div className="flex-1 flex flex-col border-r border-white/10">
-          <div className="p-4 flex items-center justify-between border-b border-white/10">
-            <h2 className="text-lg font-medium">Chat</h2>
-            <Button variant="ghost" size="icon" className="text-white/50 hover:text-white hover:bg-white/10">
-              <Settings className="w-4 h-4" />
-            </Button>
-          </div>
+          <FileUploadZone 
+            onProcess={handleProcess} 
+            isProcessing={isProcessing} 
+          />
 
-          {/* Chat Empty State */}
-          <div className="flex-1 flex flex-col items-center justify-center px-8">
-            <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center mb-6">
-              <Upload className="w-8 h-8 text-white/30" />
-            </div>
-            <h3 className="text-xl font-medium text-white/90 mb-4">Add a source to get started</h3>
-            <Button className="bg-[#2a2a2a] hover:bg-[#333] text-white border border-white/20 gap-2">
-              <Upload className="w-4 h-4" />
-              Upload a source
-            </Button>
-          </div>
-
-          {/* Chat Input */}
-          <div className="p-4 border-t border-white/10">
-            <div className="flex items-center gap-3">
-              <div className="flex-1 relative">
-                <Input 
-                  placeholder="Upload a source to get started"
-                  className="bg-white/5 border-white/10 text-white placeholder:text-white/50 pr-24"
-                  disabled
-                />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-white/30">
-                  0 sources
-                </span>
+          {/* Processing Status */}
+          {isProcessing && (
+            <div className="mt-6 p-4 rounded-xl bg-primary/10 border border-primary/30">
+              <div className="flex items-center gap-3">
+                <Loader2 className="w-5 h-5 text-primary animate-spin" />
+                <div>
+                  <p className="text-white font-medium">Processing your content...</p>
+                  <p className="text-white/50 text-sm">Generating mindmap, quiz, flashcards, and more</p>
+                </div>
               </div>
-              <Button size="icon" className="bg-white/10 hover:bg-white/15 text-white/50">
-                <ArrowRight className="w-4 h-4" />
-              </Button>
+            </div>
+          )}
+
+          {/* Error Display */}
+          {error && (
+            <div className="mt-6 p-4 rounded-xl bg-red-500/10 border border-red-500/30">
+              <div className="flex items-center gap-3">
+                <AlertCircle className="w-5 h-5 text-red-400" />
+                <div>
+                  <p className="text-white font-medium">Processing failed</p>
+                  <p className="text-white/50 text-sm">{error}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Info Cards */}
+          <div className="mt-auto pt-6 space-y-3">
+            <div className="p-4 rounded-xl bg-gradient-to-r from-emerald-900/30 to-teal-900/30 border border-emerald-500/20">
+              <p className="text-sm text-white/70">
+                <span className="text-emerald-400 font-medium">AI-Powered:</span> Generates mindmaps, audio summaries, quizzes, and flashcards automatically.
+              </p>
+            </div>
+            <div className="p-4 rounded-xl bg-gradient-to-r from-blue-900/30 to-indigo-900/30 border border-blue-500/20">
+              <p className="text-sm text-white/70">
+                <span className="text-blue-400 font-medium">Supported formats:</span> PDF, DOCX, TXT, Images, and web URLs.
+              </p>
             </div>
           </div>
         </div>
 
-        {/* Studio Panel */}
-        <div className="w-[280px] flex flex-col">
-          <div className="p-4 flex items-center justify-between">
-            <h2 className="text-lg font-medium">Studio</h2>
-            <Button variant="ghost" size="icon" className="text-white/50 hover:text-white hover:bg-white/10">
-              <FileText className="w-4 h-4" />
-            </Button>
-          </div>
+        {/* Right Panel - Results Tabs */}
+        <div className="flex-1 flex flex-col overflow-hidden">
+          {hasResults && processedData ? (
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
+              <div className="px-4 pt-4 border-b border-white/10">
+                <TabsList className="bg-white/5 p-1 h-auto flex-wrap">
+                  {tabItems.map((tab) => (
+                    <TabsTrigger
+                      key={tab.id}
+                      value={tab.id}
+                      className="flex items-center gap-2 px-4 py-2.5 data-[state=active]:bg-primary data-[state=active]:text-white text-white/60"
+                    >
+                      <tab.icon className="w-4 h-4" />
+                      <span className="hidden sm:inline">{tab.label}</span>
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+              </div>
 
-          {/* Language Banner */}
-          <div className="mx-4 p-3 rounded-xl bg-gradient-to-r from-blue-900/50 to-indigo-900/50 border border-blue-500/30 mb-6">
-            <p className="text-xs text-white/70">
-              Create an Audio Overview in:{" "}
-              <span className="text-blue-400">हिन्दी</span>,{" "}
-              <span className="text-blue-400">বাংলা</span>,{" "}
-              <span className="text-blue-400">ગુજરાતી</span>,{" "}
-              <span className="text-blue-400">ಕನ್ನಡ</span>,{" "}
-              <span className="text-blue-400">മലയാളം</span>,{" "}
-              <span className="text-blue-400">मराठी</span>,{" "}
-              <span className="text-blue-400">ਪੰਜਾਬੀ</span>,{" "}
-              <span className="text-blue-400">தமிழ்</span>,{" "}
-              <span className="text-blue-400">తెలుగు</span>
-            </p>
-          </div>
-
-          {/* Studio Features Grid */}
-          <div className="px-4 grid grid-cols-2 gap-2 mb-6">
-            {studioFeatures.map((feature) => (
-              <button
-                key={feature.label}
-                className="flex items-center gap-2 p-3 rounded-xl bg-white/5 hover:bg-white/10 transition-colors text-left"
-              >
-                <feature.icon className="w-4 h-4 text-white/50" />
-                <span className="text-sm text-white/70">{feature.label}</span>
-              </button>
-            ))}
-          </div>
-
-          {/* Studio Output */}
-          <div className="flex-1 flex flex-col items-center justify-center px-4 text-center">
-            <div className="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center mb-4">
-              <Sparkles className="w-6 h-6 text-white/30" />
+              <div className="flex-1 overflow-auto p-6">
+                <TabsContent value="mindmap" className="h-full m-0">
+                  <MindmapView diagram={processedData.mindmap} />
+                </TabsContent>
+                
+                <TabsContent value="audio" className="h-full m-0">
+                  <AudioPlayer script={processedData.audioScript} />
+                </TabsContent>
+                
+                <TabsContent value="video" className="h-full m-0">
+                  <VideoOverview slides={processedData.videoOutline} />
+                </TabsContent>
+                
+                <TabsContent value="quiz" className="h-full m-0">
+                  <QuizView questions={processedData.quiz} />
+                </TabsContent>
+                
+                <TabsContent value="flashcards" className="h-full m-0">
+                  <FlashcardsView cards={processedData.flashcards} />
+                </TabsContent>
+              </div>
+            </Tabs>
+          ) : (
+            /* Empty State */
+            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
+              <div className="w-20 h-20 rounded-2xl bg-white/5 flex items-center justify-center mb-6">
+                <Sparkles className="w-10 h-10 text-white/20" />
+              </div>
+              <h3 className="text-2xl font-semibold text-white mb-3">No content yet</h3>
+              <p className="text-white/50 max-w-md mb-8">
+                Upload a document or paste a URL to generate AI-powered learning materials including mindmaps, audio summaries, quizzes, and flashcards.
+              </p>
+              
+              {/* Preview of what will be generated */}
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 max-w-xl">
+                {tabItems.map((tab) => (
+                  <div 
+                    key={tab.id}
+                    className="flex flex-col items-center gap-2 p-4 rounded-xl bg-white/5 border border-white/10"
+                  >
+                    <tab.icon className="w-6 h-6 text-white/30" />
+                    <span className="text-xs text-white/40">{tab.label}</span>
+                  </div>
+                ))}
+              </div>
             </div>
-            <h3 className="font-medium text-white/90 mb-2">Studio output will be saved here.</h3>
-            <p className="text-sm text-white/50 leading-relaxed">
-              After adding sources, create an Audio Overview, study guides, and more!
-            </p>
-          </div>
-
-          {/* Add Note Button */}
-          <div className="p-4">
-            <Button variant="outline" className="w-full bg-white/5 border-white/20 text-white hover:bg-white/10 gap-2">
-              <StickyNote className="w-4 h-4" />
-              Add note
-            </Button>
-          </div>
+          )}
         </div>
       </div>
     </div>
