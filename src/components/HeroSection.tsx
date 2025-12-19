@@ -38,16 +38,18 @@ const HeroSection = () => {
 
           {/* CTA Buttons */}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16 opacity-0 animate-fade-up" style={{ animationDelay: "0.4s" }}>
-            <Link to="/demo">
+            <Link to="/auth">
               <Button variant="hero" size="xl">
-                Try the Demo
+                Get Started Free
                 <ArrowRight className="w-5 h-5" />
               </Button>
             </Link>
-            <Button variant="glass" size="xl">
-              <Play className="w-5 h-5" />
-              Watch Demo
-            </Button>
+            <Link to="/demo">
+              <Button variant="glass" size="xl">
+                <Play className="w-5 h-5" />
+                Try Demo
+              </Button>
+            </Link>
           </div>
 
           {/* Floating Cards */}

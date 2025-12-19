@@ -14,7 +14,104 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      notebook_permissions: {
+        Row: {
+          created_at: string
+          id: string
+          notebook_id: string
+          role: Database["public"]["Enums"]["permission_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          notebook_id: string
+          role?: Database["public"]["Enums"]["permission_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          notebook_id?: string
+          role?: Database["public"]["Enums"]["permission_role"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notebook_permissions_notebook_id_fkey"
+            columns: ["notebook_id"]
+            isOneToOne: false
+            referencedRelation: "notebooks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notebooks: {
+        Row: {
+          content_json: Json | null
+          created_at: string
+          file_urls: string[] | null
+          id: string
+          owner_id: string
+          source_content: string | null
+          source_type: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          content_json?: Json | null
+          created_at?: string
+          file_urls?: string[] | null
+          id?: string
+          owner_id: string
+          source_content?: string | null
+          source_type?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Update: {
+          content_json?: Json | null
+          created_at?: string
+          file_urls?: string[] | null
+          id?: string
+          owner_id?: string
+          source_content?: string | null
+          source_type?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          display_name: string | null
+          email: string
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          display_name?: string | null
+          email: string
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          display_name?: string | null
+          email?: string
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -23,7 +120,7 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      permission_role: "viewer" | "editor"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +247,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      permission_role: ["viewer", "editor"],
+    },
   },
 } as const
