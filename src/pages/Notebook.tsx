@@ -467,14 +467,24 @@ export default function Notebook() {
     setError(null);
     
     try {
+      console.log('Sending content for processing, length:', combinedContent.length);
+      
       const { data, error: fnError } = await supabase.functions.invoke('process-content', {
         body: { content: combinedContent, contentType: 'file' }
       });
 
-      if (fnError) throw new Error(fnError.message);
-      if (!data.success && data.error) throw new Error(data.error);
+      console.log('Edge function response:', data);
 
-      const contentData = data?.data || data;
+      if (fnError) throw new Error(fnError.message);
+      if (data?.error) throw new Error(data.error);
+      if (!data?.success) throw new Error('Processing failed');
+
+      // Extract the actual content data from the nested structure
+      const contentData = data.data;
+      
+      if (!contentData || !contentData.mindmap) {
+        throw new Error('Invalid response from AI - missing content');
+      }
       
       const sourcesForDb = sources.map(s => ({
         id: s.id,
@@ -485,16 +495,24 @@ export default function Notebook() {
         fileType: s.fileType
       }));
 
+      const newProcessedData: ProcessedData = {
+        mindmap: contentData.mindmap || '',
+        audioScript: contentData.audioScript || '',
+        videoOutline: contentData.videoOutline || [],
+        quiz: contentData.quiz || [],
+        flashcards: contentData.flashcards || []
+      };
+
       await supabase
         .from('notebooks')
         .update({
-          content_json: { ...contentData, sources: sourcesForDb } as any,
+          content_json: { ...newProcessedData, sources: sourcesForDb } as any,
           source_type: 'file',
           source_content: combinedContent.substring(0, 1000)
         })
         .eq('id', notebook.id);
 
-      setProcessedData(contentData);
+      setProcessedData(newProcessedData);
       setHasResults(true);
       setActiveTab('mindmap');
       toast.success('Insights generated successfully!');
