@@ -34,6 +34,7 @@ interface NotebookData {
     mindmap?: string;
     audioScript?: string;
     videoSlides?: Array<{ title: string; content: string }>;
+    videoOutline?: Array<{ title: string; content: string }>;
     quiz?: Array<{ question: string; options: string[]; correctIndex: number }>;
     flashcards?: Array<{ front: string; back: string }>;
   } | null;
@@ -153,16 +154,19 @@ export default function Notebook() {
     try {
       // Call the process-content edge function
       const { data, error } = await supabase.functions.invoke('process-content', {
-        body: { content, sourceType }
+        body: { content, contentType: sourceType }
       });
 
       if (error) throw error;
+      
+      // Extract the actual content data from the response
+      const contentData = data?.data || data;
 
       // Update notebook with generated content
       const { error: updateError } = await supabase
         .from('notebooks')
         .update({
-          content_json: data,
+          content_json: contentData,
           source_type: sourceType,
           source_content: content.substring(0, 1000) // Store first 1000 chars
         })
@@ -170,7 +174,7 @@ export default function Notebook() {
 
       if (updateError) throw updateError;
 
-      setNotebook(prev => prev ? { ...prev, content_json: data, source_type: sourceType } : null);
+      setNotebook(prev => prev ? { ...prev, content_json: contentData, source_type: sourceType } : null);
       setActiveTab('mindmap');
       toast.success('Content processed successfully!');
     } catch (error) {
@@ -241,66 +245,100 @@ export default function Notebook() {
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="container-tight py-8">
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="mb-6 flex-wrap h-auto gap-1">
-            <TabsTrigger value="upload" className="gap-2">
-              <Save className="h-4 w-4" />
-              <span className="hidden sm:inline">Upload</span>
-            </TabsTrigger>
-            <TabsTrigger value="mindmap" disabled={!hasContent} className="gap-2">
-              <Brain className="h-4 w-4" />
-              <span className="hidden sm:inline">Mindmap</span>
-            </TabsTrigger>
-            <TabsTrigger value="audio" disabled={!hasContent} className="gap-2">
-              <Headphones className="h-4 w-4" />
-              <span className="hidden sm:inline">Audio</span>
-            </TabsTrigger>
-            <TabsTrigger value="video" disabled={!hasContent} className="gap-2">
-              <Video className="h-4 w-4" />
-              <span className="hidden sm:inline">Video</span>
-            </TabsTrigger>
-            <TabsTrigger value="quiz" disabled={!hasContent} className="gap-2">
-              <HelpCircle className="h-4 w-4" />
-              <span className="hidden sm:inline">Quiz</span>
-            </TabsTrigger>
-            <TabsTrigger value="flashcards" disabled={!hasContent} className="gap-2">
-              <Layers className="h-4 w-4" />
-              <span className="hidden sm:inline">Flashcards</span>
-            </TabsTrigger>
-          </TabsList>
+      {/* Main Content - Demo Style Layout */}
+      <main className="section-padding">
+        <div className="container-tight">
+          {/* Header Section */}
+          <div className="max-w-3xl mx-auto text-center mb-12">
+            <p className="text-sm font-semibold text-primary uppercase tracking-wider mb-4">
+              Notebook
+            </p>
+            <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-foreground mb-6">
+              Transform Your Content Into{" "}
+              <span className="gradient-text">Learning Materials</span>
+            </h2>
+            <p className="text-lg text-muted-foreground">
+              Upload documents or paste URLs to generate mindmaps, audio, quizzes, and flashcards.
+            </p>
+          </div>
 
-          <TabsContent value="upload">
-            {canEdit ? (
-              <FileUploadZone onProcess={handleProcessContent} isProcessing={processing} />
-            ) : (
-              <div className="text-center py-12 text-muted-foreground">
-                You have view-only access to this notebook
+          {/* Main Card - Demo Style */}
+          <div className="max-w-4xl mx-auto">
+            <div className="relative rounded-3xl overflow-hidden glass-card">
+              {/* Gradient Background */}
+              <div className="absolute inset-0 gradient-primary opacity-10" />
+              
+              {/* Grid Pattern */}
+              <div className="absolute inset-0 bg-[linear-gradient(to_right,hsl(var(--border)/0.2)_1px,transparent_1px),linear-gradient(to_bottom,hsl(var(--border)/0.2)_1px,transparent_1px)] bg-[size:2rem_2rem]" />
+
+              {/* Content */}
+              <div className="relative p-8">
+                <Tabs value={activeTab} onValueChange={setActiveTab}>
+                  <TabsList className="mb-6 flex-wrap h-auto gap-1 bg-background/50 backdrop-blur-sm">
+                    <TabsTrigger value="upload" className="gap-2">
+                      <Save className="h-4 w-4" />
+                      <span className="hidden sm:inline">Upload</span>
+                    </TabsTrigger>
+                    <TabsTrigger value="mindmap" disabled={!hasContent} className="gap-2">
+                      <Brain className="h-4 w-4" />
+                      <span className="hidden sm:inline">Mindmap</span>
+                    </TabsTrigger>
+                    <TabsTrigger value="audio" disabled={!hasContent} className="gap-2">
+                      <Headphones className="h-4 w-4" />
+                      <span className="hidden sm:inline">Audio</span>
+                    </TabsTrigger>
+                    <TabsTrigger value="video" disabled={!hasContent} className="gap-2">
+                      <Video className="h-4 w-4" />
+                      <span className="hidden sm:inline">Video</span>
+                    </TabsTrigger>
+                    <TabsTrigger value="quiz" disabled={!hasContent} className="gap-2">
+                      <HelpCircle className="h-4 w-4" />
+                      <span className="hidden sm:inline">Quiz</span>
+                    </TabsTrigger>
+                    <TabsTrigger value="flashcards" disabled={!hasContent} className="gap-2">
+                      <Layers className="h-4 w-4" />
+                      <span className="hidden sm:inline">Flashcards</span>
+                    </TabsTrigger>
+                  </TabsList>
+
+                  <TabsContent value="upload">
+                    {canEdit ? (
+                      <FileUploadZone onProcess={handleProcessContent} isProcessing={processing} />
+                    ) : (
+                      <div className="text-center py-12 text-muted-foreground">
+                        You have view-only access to this notebook
+                      </div>
+                    )}
+                  </TabsContent>
+
+                  <TabsContent value="mindmap">
+                    <MindmapView diagram={content.mindmap || ''} />
+                  </TabsContent>
+
+                  <TabsContent value="audio">
+                    <AudioPlayer script={content.audioScript || ''} />
+                  </TabsContent>
+
+                  <TabsContent value="video">
+                    <VideoOverview slides={content.videoOutline || content.videoSlides || []} />
+                  </TabsContent>
+
+                  <TabsContent value="quiz">
+                    <QuizView questions={content.quiz || []} />
+                  </TabsContent>
+
+                  <TabsContent value="flashcards">
+                    <FlashcardsView cards={content.flashcards || []} />
+                  </TabsContent>
+                </Tabs>
               </div>
-            )}
-          </TabsContent>
 
-          <TabsContent value="mindmap">
-            <MindmapView diagram={content.mindmap || ''} />
-          </TabsContent>
-
-          <TabsContent value="audio">
-            <AudioPlayer script={content.audioScript || ''} />
-          </TabsContent>
-
-          <TabsContent value="video">
-            <VideoOverview slides={content.videoSlides || []} />
-          </TabsContent>
-
-          <TabsContent value="quiz">
-            <QuizView questions={content.quiz || []} />
-          </TabsContent>
-
-          <TabsContent value="flashcards">
-            <FlashcardsView cards={content.flashcards || []} />
-          </TabsContent>
-        </Tabs>
+              {/* Decorative Elements */}
+              <div className="absolute top-4 right-4 w-24 h-24 border-2 border-primary/20 rounded-2xl pointer-events-none" />
+              <div className="absolute bottom-4 left-4 w-16 h-16 border-2 border-primary/20 rounded-xl pointer-events-none" />
+            </div>
+          </div>
+        </div>
       </main>
 
       {/* Share Modal */}
