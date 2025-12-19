@@ -4,27 +4,22 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { 
-  ArrowLeft, 
-  BookOpen, 
-  Save, 
-  Share2, 
-  Loader2,
-  Brain,
-  Headphones,
-  Video,
-  HelpCircle,
-  Layers
-} from 'lucide-react';
-import FileUploadZone from '@/components/demo/FileUploadZone';
-import MindmapView from '@/components/demo/MindmapView';
-import AudioPlayer from '@/components/demo/AudioPlayer';
-import VideoOverview from '@/components/demo/VideoOverview';
-import QuizView from '@/components/demo/QuizView';
-import FlashcardsView from '@/components/demo/FlashcardsView';
+import { ArrowLeft, BookOpen, Save, Share2, Loader2 } from 'lucide-react';
 import { ShareModal } from '@/components/ShareModal';
+import SourcesPanel from '@/components/notebook/SourcesPanel';
+import ChatPanel from '@/components/notebook/ChatPanel';
+import InsightsPanel from '@/components/notebook/InsightsPanel';
+import MobileNav from '@/components/notebook/MobileNav';
+import { useIsMobile } from '@/hooks/use-mobile';
+
+interface Source {
+  id: string;
+  name: string;
+  type: 'file' | 'url';
+  content: string;
+  active: boolean;
+}
 
 interface NotebookData {
   id: string;
@@ -37,6 +32,7 @@ interface NotebookData {
     videoOutline?: Array<{ title: string; content: string }>;
     quiz?: Array<{ question: string; options: string[]; correctIndex: number }>;
     flashcards?: Array<{ front: string; back: string }>;
+    sources?: Source[];
   } | null;
   source_type?: string | null;
   source_content?: string | null;
@@ -46,15 +42,18 @@ export default function Notebook() {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   
   const [notebook, setNotebook] = useState<NotebookData | null>(null);
   const [title, setTitle] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [processing, setProcessing] = useState(false);
-  const [activeTab, setActiveTab] = useState('upload');
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [canEdit, setCanEdit] = useState(false);
+  const [sources, setSources] = useState<Source[]>([]);
+  const [activePane, setActivePane] = useState<'sources' | 'chat' | 'insights'>('sources');
+  const [activeInsightTab, setActiveInsightTab] = useState('mindmap');
 
   const fetchNotebook = useCallback(async () => {
     if (!id || !user) return;
@@ -68,11 +67,17 @@ export default function Notebook() {
 
       if (error) throw error;
       
-      setNotebook(data as NotebookData);
-      setTitle(data.title);
+      const notebookData = data as NotebookData;
+      setNotebook(notebookData);
+      setTitle(notebookData.title);
+      
+      // Load sources from content_json
+      if (notebookData.content_json?.sources) {
+        setSources(notebookData.content_json.sources);
+      }
       
       // Check if user can edit
-      if (data.owner_id === user.id) {
+      if (notebookData.owner_id === user.id) {
         setCanEdit(true);
       } else {
         const { data: permission } = await supabase
@@ -85,9 +90,10 @@ export default function Notebook() {
         setCanEdit(permission?.role === 'editor');
       }
 
-      // If content exists, switch to results tab
-      if (data.content_json && Object.keys(data.content_json).length > 0) {
-        setActiveTab('mindmap');
+      // If content exists, switch to insights
+      if (notebookData.content_json && 
+          Object.keys(notebookData.content_json).some(k => k !== 'sources')) {
+        setActivePane('insights');
       }
     } catch (error) {
       console.error('Error fetching notebook:', error);
@@ -101,7 +107,7 @@ export default function Notebook() {
   useEffect(() => {
     fetchNotebook();
 
-    // Set up realtime subscription for collaborative updates
+    // Set up realtime subscription
     if (id) {
       const channel = supabase
         .channel(`notebook-${id}`)
@@ -117,6 +123,9 @@ export default function Notebook() {
             const updatedNotebook = payload.new as NotebookData;
             setNotebook(updatedNotebook);
             setTitle(updatedNotebook.title);
+            if (updatedNotebook.content_json?.sources) {
+              setSources(updatedNotebook.content_json.sources);
+            }
           }
         )
         .subscribe();
@@ -126,6 +135,33 @@ export default function Notebook() {
       };
     }
   }, [id, fetchNotebook]);
+
+  // Save sources whenever they change
+  useEffect(() => {
+    if (!notebook || !canEdit || sources.length === 0) return;
+    
+    const saveDebounced = setTimeout(async () => {
+      const currentContent = notebook.content_json || {};
+      const sourcesForDb = sources.map(s => ({
+        id: s.id,
+        name: s.name,
+        type: s.type,
+        content: s.content,
+        active: s.active
+      }));
+      
+      const { error } = await supabase
+        .from('notebooks')
+        .update({
+          content_json: { ...currentContent, sources: sourcesForDb } as any
+        })
+        .eq('id', notebook.id);
+
+      if (error) console.error('Error saving sources:', error);
+    }, 1000);
+
+    return () => clearTimeout(saveDebounced);
+  }, [sources, notebook, canEdit]);
 
   const handleSaveTitle = async () => {
     if (!notebook || !canEdit) return;
@@ -147,36 +183,61 @@ export default function Notebook() {
     }
   };
 
-  const handleProcessContent = async (content: string, sourceType: string) => {
+  const handleProcessSources = async () => {
     if (!notebook || !canEdit) return;
     
+    const activeSources = sources.filter(s => s.active);
+    if (activeSources.length === 0) {
+      toast.error('Please add at least one source');
+      return;
+    }
+
+    const combinedContent = activeSources
+      .map(s => `--- ${s.name} ---\n${s.content}`)
+      .join('\n\n');
+
+    if (combinedContent.length > 40000) {
+      toast.error('Content is too large. Please use smaller sources.');
+      return;
+    }
+
     setProcessing(true);
     try {
-      // Call the process-content edge function
       const { data, error } = await supabase.functions.invoke('process-content', {
-        body: { content, contentType: sourceType }
+        body: { content: combinedContent, contentType: 'file' }
       });
 
       if (error) throw error;
-      
-      // Extract the actual content data from the response
+
       const contentData = data?.data || data;
 
-      // Update notebook with generated content
+      // Convert sources to JSON-compatible format
+      const sourcesForDb = sources.map(s => ({
+        id: s.id,
+        name: s.name,
+        type: s.type,
+        content: s.content,
+        active: s.active
+      }));
+
       const { error: updateError } = await supabase
         .from('notebooks')
         .update({
-          content_json: contentData,
-          source_type: sourceType,
-          source_content: content.substring(0, 1000) // Store first 1000 chars
+          content_json: { ...contentData, sources: sourcesForDb } as any,
+          source_type: 'file',
+          source_content: combinedContent.substring(0, 1000)
         })
         .eq('id', notebook.id);
 
       if (updateError) throw updateError;
 
-      setNotebook(prev => prev ? { ...prev, content_json: contentData, source_type: sourceType } : null);
-      setActiveTab('mindmap');
-      toast.success('Content processed successfully!');
+      setNotebook(prev => prev ? { 
+        ...prev, 
+        content_json: { ...contentData, sources } 
+      } : null);
+      
+      setActivePane('insights');
+      toast.success('Insights generated successfully!');
     } catch (error) {
       console.error('Error processing content:', error);
       toast.error('Failed to process content. Please try again.');
@@ -185,8 +246,14 @@ export default function Notebook() {
     }
   };
 
-  const content = (notebook?.content_json || {}) as NotebookData['content_json'] & Record<string, unknown>;
-  const hasContent = content && Object.keys(content).length > 0;
+  const getSourceContents = () => {
+    return sources
+      .filter(s => s.active)
+      .map(s => `--- ${s.name} ---\n${s.content}`)
+      .join('\n\n');
+  };
+
+  const content = notebook?.content_json || {};
 
   if (loading) {
     return (
@@ -205,15 +272,15 @@ export default function Notebook() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="h-screen flex flex-col bg-background">
       {/* Header */}
-      <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
-        <div className="container-tight flex items-center justify-between h-16">
-          <div className="flex items-center gap-4">
+      <header className="border-b border-border bg-card/50 backdrop-blur-sm z-50 flex-shrink-0">
+        <div className="flex items-center justify-between h-14 px-4">
+          <div className="flex items-center gap-3">
             <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')}>
               <ArrowLeft className="h-5 w-5" />
             </Button>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
               <div className="h-8 w-8 rounded-lg gradient-primary flex items-center justify-center">
                 <BookOpen className="h-4 w-4 text-primary-foreground" />
               </div>
@@ -223,13 +290,13 @@ export default function Notebook() {
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
                     onBlur={handleSaveTitle}
-                    className="font-display font-semibold text-lg border-none bg-transparent p-0 h-auto focus-visible:ring-0"
+                    className="font-semibold text-base border-none bg-transparent p-0 h-auto focus-visible:ring-0 w-40 md:w-auto"
                     placeholder="Untitled Notebook"
                   />
                   {saving && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
                 </div>
               ) : (
-                <span className="font-display font-semibold text-lg">{title}</span>
+                <span className="font-semibold text-base truncate max-w-[150px] md:max-w-none">{title}</span>
               )}
             </div>
           </div>
@@ -237,109 +304,84 @@ export default function Notebook() {
           <div className="flex items-center gap-2">
             {notebook.owner_id === user?.id && (
               <Button variant="outline" size="sm" onClick={() => setShareModalOpen(true)}>
-                <Share2 className="h-4 w-4 mr-2" />
-                Share
+                <Share2 className="h-4 w-4 md:mr-2" />
+                <span className="hidden md:inline">Share</span>
               </Button>
             )}
           </div>
         </div>
       </header>
 
-      {/* Main Content - Demo Style Layout */}
-      <main className="section-padding">
-        <div className="container-tight">
-          {/* Header Section */}
-          <div className="max-w-3xl mx-auto text-center mb-12">
-            <p className="text-sm font-semibold text-primary uppercase tracking-wider mb-4">
-              Notebook
-            </p>
-            <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-foreground mb-6">
-              Transform Your Content Into{" "}
-              <span className="gradient-text">Learning Materials</span>
-            </h2>
-            <p className="text-lg text-muted-foreground">
-              Upload documents or paste URLs to generate mindmaps, audio, quizzes, and flashcards.
-            </p>
-          </div>
-
-          {/* Main Card - Demo Style */}
-          <div className="max-w-4xl mx-auto">
-            <div className="relative rounded-3xl overflow-hidden glass-card">
-              {/* Gradient Background */}
-              <div className="absolute inset-0 gradient-primary opacity-10" />
-              
-              {/* Grid Pattern */}
-              <div className="absolute inset-0 bg-[linear-gradient(to_right,hsl(var(--border)/0.2)_1px,transparent_1px),linear-gradient(to_bottom,hsl(var(--border)/0.2)_1px,transparent_1px)] bg-[size:2rem_2rem]" />
-
-              {/* Content */}
-              <div className="relative p-8">
-                <Tabs value={activeTab} onValueChange={setActiveTab}>
-                  <TabsList className="mb-6 flex-wrap h-auto gap-1 bg-background/50 backdrop-blur-sm">
-                    <TabsTrigger value="upload" className="gap-2">
-                      <Save className="h-4 w-4" />
-                      <span className="hidden sm:inline">Upload</span>
-                    </TabsTrigger>
-                    <TabsTrigger value="mindmap" disabled={!hasContent} className="gap-2">
-                      <Brain className="h-4 w-4" />
-                      <span className="hidden sm:inline">Mindmap</span>
-                    </TabsTrigger>
-                    <TabsTrigger value="audio" disabled={!hasContent} className="gap-2">
-                      <Headphones className="h-4 w-4" />
-                      <span className="hidden sm:inline">Audio</span>
-                    </TabsTrigger>
-                    <TabsTrigger value="video" disabled={!hasContent} className="gap-2">
-                      <Video className="h-4 w-4" />
-                      <span className="hidden sm:inline">Video</span>
-                    </TabsTrigger>
-                    <TabsTrigger value="quiz" disabled={!hasContent} className="gap-2">
-                      <HelpCircle className="h-4 w-4" />
-                      <span className="hidden sm:inline">Quiz</span>
-                    </TabsTrigger>
-                    <TabsTrigger value="flashcards" disabled={!hasContent} className="gap-2">
-                      <Layers className="h-4 w-4" />
-                      <span className="hidden sm:inline">Flashcards</span>
-                    </TabsTrigger>
-                  </TabsList>
-
-                  <TabsContent value="upload">
-                    {canEdit ? (
-                      <FileUploadZone onProcess={handleProcessContent} isProcessing={processing} />
-                    ) : (
-                      <div className="text-center py-12 text-muted-foreground">
-                        You have view-only access to this notebook
-                      </div>
-                    )}
-                  </TabsContent>
-
-                  <TabsContent value="mindmap">
-                    <MindmapView diagram={content.mindmap || ''} />
-                  </TabsContent>
-
-                  <TabsContent value="audio">
-                    <AudioPlayer script={content.audioScript || ''} />
-                  </TabsContent>
-
-                  <TabsContent value="video">
-                    <VideoOverview slides={content.videoOutline || content.videoSlides || []} />
-                  </TabsContent>
-
-                  <TabsContent value="quiz">
-                    <QuizView questions={content.quiz || []} />
-                  </TabsContent>
-
-                  <TabsContent value="flashcards">
-                    <FlashcardsView cards={content.flashcards || []} />
-                  </TabsContent>
-                </Tabs>
-              </div>
-
-              {/* Decorative Elements */}
-              <div className="absolute top-4 right-4 w-24 h-24 border-2 border-primary/20 rounded-2xl pointer-events-none" />
-              <div className="absolute bottom-4 left-4 w-16 h-16 border-2 border-primary/20 rounded-xl pointer-events-none" />
+      {/* Main Content - Three Pane Layout */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Desktop Layout */}
+        {!isMobile ? (
+          <>
+            {/* Sources Panel - Left */}
+            <div className="w-64 flex-shrink-0">
+              <SourcesPanel
+                sources={sources}
+                onSourcesChange={setSources}
+                onProcessSources={handleProcessSources}
+                isProcessing={processing}
+                canEdit={canEdit}
+              />
             </div>
+
+            {/* Chat Panel - Center */}
+            <div className="flex-1 border-x border-border">
+              <ChatPanel
+                notebookId={notebook.id}
+                sourceContents={getSourceContents()}
+                canEdit={canEdit}
+              />
+            </div>
+
+            {/* Insights Panel - Right */}
+            <div className="w-80 flex-shrink-0">
+              <InsightsPanel
+                content={content}
+                isProcessing={processing}
+                activeTab={activeInsightTab}
+                onTabChange={setActiveInsightTab}
+              />
+            </div>
+          </>
+        ) : (
+          /* Mobile Layout - Single pane with bottom nav */
+          <div className="flex-1 pb-16">
+            {activePane === 'sources' && (
+              <SourcesPanel
+                sources={sources}
+                onSourcesChange={setSources}
+                onProcessSources={handleProcessSources}
+                isProcessing={processing}
+                canEdit={canEdit}
+              />
+            )}
+            {activePane === 'chat' && (
+              <ChatPanel
+                notebookId={notebook.id}
+                sourceContents={getSourceContents()}
+                canEdit={canEdit}
+              />
+            )}
+            {activePane === 'insights' && (
+              <InsightsPanel
+                content={content}
+                isProcessing={processing}
+                activeTab={activeInsightTab}
+                onTabChange={setActiveInsightTab}
+              />
+            )}
           </div>
-        </div>
-      </main>
+        )}
+      </div>
+
+      {/* Mobile Navigation */}
+      {isMobile && (
+        <MobileNav activePane={activePane} onPaneChange={setActivePane} />
+      )}
 
       {/* Share Modal */}
       <ShareModal
