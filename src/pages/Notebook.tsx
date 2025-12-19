@@ -198,46 +198,54 @@ export default function Notebook() {
   };
 
   // File extraction functions
-  const extractText = async (file: File): Promise<string> => {
+  const extractText = async (file: File): Promise<{ text: string; needsServerProcessing: boolean }> => {
     const fileName = file.name.toLowerCase();
     
     if (file.type === 'text/plain' || fileName.endsWith('.txt') || fileName.endsWith('.md')) {
-      return await file.text();
+      return { text: await file.text(), needsServerProcessing: false };
     }
     
     if (file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || 
         fileName.endsWith('.docx')) {
       try {
         const arrayBuffer = await file.arrayBuffer();
-        return await extractTextFromDocx(arrayBuffer);
+        const text = await extractTextFromDocx(arrayBuffer);
+        return { text, needsServerProcessing: false };
       } catch (error) {
         console.error('Error extracting DOCX:', error);
-        toast.error(`Could not extract text from ${file.name}`);
-        return '';
+        return { text: '', needsServerProcessing: true };
       }
     }
     
-    if (file.type === 'application/pdf' || fileName.endsWith('.pdf')) {
-      // For PDF, we'll send a note that it's a PDF
-      return `[PDF Document: ${file.name}] - PDF text extraction will be processed by AI.`;
-    }
-    
-    if (file.type.startsWith('image/')) {
-      // For images, convert to base64 for AI processing
-      return new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onload = () => {
-          resolve(`[Image: ${file.name}] ${reader.result}`);
-        };
-        reader.readAsDataURL(file);
-      });
+    // PDFs and images need server-side processing
+    if (file.type === 'application/pdf' || fileName.endsWith('.pdf') || file.type.startsWith('image/')) {
+      return { text: '', needsServerProcessing: true };
     }
     
     try {
-      return await file.text();
+      return { text: await file.text(), needsServerProcessing: false };
     } catch {
-      return '';
+      return { text: '', needsServerProcessing: true };
     }
+  };
+
+  const extractTextFromServer = async (file: File): Promise<string> => {
+    const arrayBuffer = await file.arrayBuffer();
+    const base64 = btoa(
+      new Uint8Array(arrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
+    );
+    
+    const { data, error } = await supabase.functions.invoke('process-content', {
+      body: { 
+        fileData: base64,
+        fileName: file.name,
+        fileType: file.type,
+        contentType: 'file'
+      }
+    });
+
+    if (error) throw new Error(error.message);
+    return data?.extractedText || '';
   };
 
   const extractTextFromDocx = async (arrayBuffer: ArrayBuffer): Promise<string> => {
@@ -347,16 +355,29 @@ export default function Notebook() {
     const newSources: Source[] = [];
     
     for (const file of files) {
-      const text = await extractText(file);
-      if (text) {
-        newSources.push({
-          id: crypto.randomUUID(),
-          name: file.name,
-          type: 'file',
-          content: text,
-          active: true,
-          fileType: file.type
-        });
+      try {
+        const result = await extractText(file);
+        let text = result.text;
+        
+        // If needs server processing, send to edge function
+        if (result.needsServerProcessing) {
+          toast.info(`Extracting text from ${file.name}...`);
+          text = await extractTextFromServer(file);
+        }
+        
+        if (text) {
+          newSources.push({
+            id: crypto.randomUUID(),
+            name: file.name,
+            type: 'file',
+            content: text,
+            active: true,
+            fileType: file.type
+          });
+        }
+      } catch (err) {
+        console.error('Error processing file:', err);
+        toast.error(`Failed to process ${file.name}`);
       }
     }
     

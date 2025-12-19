@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 interface FileUploadZoneProps {
-  onProcess: (content: string, type: 'file' | 'url') => void;
+  onProcess: (content: string, type: 'file' | 'url', files?: File[]) => void;
   isProcessing: boolean;
 }
 
@@ -53,12 +53,12 @@ const FileUploadZone = ({ onProcess, isProcessing }: FileUploadZoneProps) => {
   };
 
   // Extract text from files - handles different file types
-  const extractTextFromFile = async (file: File): Promise<string> => {
+  const extractTextFromFile = async (file: File): Promise<{ text: string; needsServerProcessing: boolean }> => {
     const fileName = file.name.toLowerCase();
     
     // For plain text files, read directly
     if (file.type === 'text/plain' || fileName.endsWith('.txt') || fileName.endsWith('.md')) {
-      return await file.text();
+      return { text: await file.text(), needsServerProcessing: false };
     }
     
     // For DOCX files, we need to extract the XML content
@@ -67,31 +67,24 @@ const FileUploadZone = ({ onProcess, isProcessing }: FileUploadZoneProps) => {
       try {
         const arrayBuffer = await file.arrayBuffer();
         const text = await extractTextFromDocx(arrayBuffer);
-        return text;
+        return { text, needsServerProcessing: false };
       } catch (error) {
         console.error('Error extracting DOCX text:', error);
-        toast.error(`Could not extract text from ${file.name}. Please try a .txt file.`);
-        return '';
+        // Fall back to server-side processing
+        return { text: '', needsServerProcessing: true };
       }
     }
     
-    // For PDF files, inform user about limitations
-    if (file.type === 'application/pdf' || fileName.endsWith('.pdf')) {
-      toast.error('PDF parsing is not yet supported. Please copy/paste the text or upload a .txt file.');
-      return '';
-    }
-    
-    // For images, we can't extract text client-side
-    if (file.type.startsWith('image/')) {
-      toast.error('Image text extraction is not yet supported. Please copy/paste the text.');
-      return '';
+    // For PDF files and images, mark for server-side processing
+    if (file.type === 'application/pdf' || fileName.endsWith('.pdf') || file.type.startsWith('image/')) {
+      return { text: '', needsServerProcessing: true };
     }
     
     // Fallback - try to read as text
     try {
-      return await file.text();
+      return { text: await file.text(), needsServerProcessing: false };
     } catch {
-      return '';
+      return { text: '', needsServerProcessing: true };
     }
   };
 
@@ -195,14 +188,23 @@ const FileUploadZone = ({ onProcess, isProcessing }: FileUploadZoneProps) => {
     if (activeTab === 'url' && url) {
       onProcess(url, 'url');
     } else if (activeTab === 'file' && files.length > 0) {
-      // Extract text content from files
+      // Check if any files need server-side processing (PDFs, images)
       const fileContents: string[] = [];
+      const filesToUpload: File[] = [];
       
       for (const file of files) {
-        const text = await extractTextFromFile(file);
-        if (text.trim()) {
-          fileContents.push(`--- ${file.name} ---\n${text}`);
+        const result = await extractTextFromFile(file);
+        if (result.needsServerProcessing) {
+          filesToUpload.push(file);
+        } else if (result.text.trim()) {
+          fileContents.push(`--- ${file.name} ---\n${result.text}`);
         }
+      }
+      
+      // If we have files that need server processing, send them
+      if (filesToUpload.length > 0) {
+        onProcess(fileContents.join('\n\n'), 'file', filesToUpload);
+        return;
       }
       
       if (fileContents.length === 0) {
@@ -268,7 +270,7 @@ const FileUploadZone = ({ onProcess, isProcessing }: FileUploadZoneProps) => {
           <input
             type="file"
             multiple
-            accept=".txt,.md,.docx"
+            accept=".txt,.md,.docx,.pdf,image/*"
             onChange={handleFileSelect}
             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
           />
@@ -281,7 +283,7 @@ const FileUploadZone = ({ onProcess, isProcessing }: FileUploadZoneProps) => {
                 {isDragOver ? "Drop files here" : "Drag & drop files here"}
               </p>
               <p className="text-white/50 text-sm mt-1">
-                or click to browse (TXT, DOCX, Markdown)
+                or click to browse (PDF, DOCX, TXT, Images)
               </p>
             </div>
           </div>

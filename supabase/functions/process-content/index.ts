@@ -6,6 +6,90 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Extract text from PDF using AI vision
+async function extractTextFromPDF(base64Data: string, apiKey: string): Promise<string> {
+  console.log('Extracting text from PDF using AI...');
+  
+  const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'google/gemini-2.5-flash',
+      messages: [
+        { 
+          role: 'user', 
+          content: [
+            {
+              type: 'text',
+              text: 'Extract all the text content from this document. Return only the extracted text, preserving the structure and formatting as much as possible. Do not add any commentary or explanations.'
+            },
+            {
+              type: 'image_url',
+              image_url: {
+                url: `data:application/pdf;base64,${base64Data}`
+              }
+            }
+          ]
+        }
+      ],
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    console.error('PDF extraction error:', error);
+    throw new Error('Failed to extract text from PDF');
+  }
+
+  const data = await response.json();
+  return data.choices[0]?.message?.content || '';
+}
+
+// Extract text from image using AI vision
+async function extractTextFromImage(base64Data: string, mimeType: string, apiKey: string): Promise<string> {
+  console.log('Extracting text from image using AI vision...');
+  
+  const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'google/gemini-2.5-flash',
+      messages: [
+        { 
+          role: 'user', 
+          content: [
+            {
+              type: 'text',
+              text: 'Extract all the text content from this image. If there is no text, describe the key concepts, diagrams, or information shown. Return the extracted content in a clear, structured format.'
+            },
+            {
+              type: 'image_url',
+              image_url: {
+                url: `data:${mimeType};base64,${base64Data}`
+              }
+            }
+          ]
+        }
+      ],
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    console.error('Image extraction error:', error);
+    throw new Error('Failed to extract text from image');
+  }
+
+  const data = await response.json();
+  return data.choices[0]?.message?.content || '';
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -38,9 +122,35 @@ serve(async (req) => {
 
     console.log('Authenticated user:', user.id);
 
-    const { content, contentType } = await req.json();
+    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+    if (!LOVABLE_API_KEY) {
+      throw new Error('LOVABLE_API_KEY is not configured');
+    }
+
+    const body = await req.json();
+    const { content, contentType, fileData, fileName, fileType } = body;
     
-    // Input validation
+    // Handle file data extraction (PDFs, images)
+    if (fileData && fileName) {
+      console.log('Processing file:', fileName, 'type:', fileType);
+      
+      let extractedText = '';
+      
+      if (fileType === 'application/pdf' || fileName.toLowerCase().endsWith('.pdf')) {
+        extractedText = await extractTextFromPDF(fileData, LOVABLE_API_KEY);
+      } else if (fileType?.startsWith('image/')) {
+        extractedText = await extractTextFromImage(fileData, fileType, LOVABLE_API_KEY);
+      }
+      
+      console.log('Extracted text length:', extractedText.length);
+      
+      return new Response(
+        JSON.stringify({ success: true, extractedText }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Input validation for regular content processing
     if (!content) {
       return new Response(
         JSON.stringify({ error: 'Content is required' }),
@@ -62,11 +172,6 @@ serve(async (req) => {
         JSON.stringify({ error: 'Invalid content type' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
-    }
-
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
-      throw new Error('LOVABLE_API_KEY is not configured');
     }
 
     console.log('Processing content of type:', contentType, 'for user:', user.id);

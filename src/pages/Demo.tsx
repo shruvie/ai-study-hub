@@ -41,12 +41,43 @@ const Demo = () => {
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
-  const handleProcess = async (content: string, type: 'file' | 'url') => {
+  const handleProcess = async (content: string, type: 'file' | 'url', files?: File[]) => {
     setIsProcessing(true);
     setError(null);
     
     try {
       let textContent = content;
+      
+      // If we have files that need server-side processing (PDFs, images)
+      if (files && files.length > 0) {
+        const fileTexts: string[] = [];
+        
+        for (const file of files) {
+          // Convert file to base64 for server-side processing
+          const arrayBuffer = await file.arrayBuffer();
+          const base64 = btoa(
+            new Uint8Array(arrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
+          );
+          
+          // Call process-content with file data
+          const { data, error: fnError } = await supabase.functions.invoke('process-content', {
+            body: { 
+              fileData: base64,
+              fileName: file.name,
+              fileType: file.type,
+              contentType: 'file'
+            }
+          });
+
+          if (fnError) throw new Error(fnError.message);
+          if (data?.extractedText) {
+            fileTexts.push(`--- ${file.name} ---\n${data.extractedText}`);
+          }
+        }
+        
+        // Combine extracted text with any text content
+        textContent = [content, ...fileTexts].filter(Boolean).join('\n\n');
+      }
       
       // If URL, we'll pass it to the backend for processing
       if (type === 'url') {
