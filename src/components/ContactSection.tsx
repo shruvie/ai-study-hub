@@ -36,7 +36,7 @@ const ContactSection = () => {
         <div className="max-w-3xl mx-auto">
           <div className="text-center mb-12">
             <p className="text-sm font-semibold text-primary uppercase tracking-wider mb-4">
-              Contact
+              Contact Us
             </p>
             <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-foreground mb-6">
               Get in{" "}
