@@ -185,7 +185,6 @@ const BranchNode = ({
       {/* Sticky note body */}
       <div className={`
         relative bg-gradient-to-br ${colorClass} 
-        backdrop-blur-sm
         px-5 py-4 rounded-lg 
         border shadow-lg
         transform transition-all duration-300
