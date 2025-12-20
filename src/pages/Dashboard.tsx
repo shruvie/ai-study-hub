@@ -273,7 +273,7 @@ export default function Dashboard() {
             <div className="h-8 w-8 rounded-lg gradient-primary flex items-center justify-center">
               <BookOpen className="h-4 w-4 text-primary-foreground" />
             </div>
-            <span className="font-display font-semibold text-lg">NoteGenius</span>
+            <span className="font-display font-semibold text-lg">Study Sphere AI</span>
           </div>
           
           <div className="flex items-center gap-4">
