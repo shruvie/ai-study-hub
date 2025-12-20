@@ -73,7 +73,7 @@ export function ShareModal({ open, onOpenChange, notebookId, notebookTitle, onSh
           
           return {
             ...perm,
-            email: profile?.email || 'email'
+            email: profile?.email || email
           };
         })
       );
