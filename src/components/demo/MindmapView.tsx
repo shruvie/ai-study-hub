@@ -194,7 +194,7 @@ const BranchNode = ({
         <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-8 h-4 bg-primary/20 rounded-sm border border-primary/30" />
         
         {/* Subtle paper texture */}
-        <div className="absolute inset-0 opacity-30 rounded-lg" 
+        <div className="absolute inset-0 opacity-80 rounded-lg" 
           style={{ 
             backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 24px, hsl(var(--foreground) / 0.03) 24px, hsl(var(--foreground) / 0.03) 25px)'
           }} 
