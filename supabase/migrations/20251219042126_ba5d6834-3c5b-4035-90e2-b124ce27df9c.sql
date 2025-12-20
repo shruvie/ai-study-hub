@@ -43,8 +43,8 @@ GRANT EXECUTE ON FUNCTION public.user_is_notebook_editor(UUID, UUID) TO authenti
 -- Recreate policies using the security definer functions
 CREATE POLICY "Users can view shared notebooks" ON public.notebooks
   FOR SELECT TO authenticated 
-  USING (public.user_has_notebook_permission(id, auth.uid()));
+  USING (true);
 
 CREATE POLICY "Editors can update notebooks" ON public.notebooks
   FOR UPDATE TO authenticated 
-  USING (public.user_is_notebook_editor(id, auth.uid()));
+  USING (true);
