@@ -105,7 +105,7 @@ export default function Auth() {
             </div>
           </div>
           <div>
-            <CardTitle className="text-2xl font-display">Welcome to NoteGenius</CardTitle>
+            <CardTitle className="text-2xl font-display">Welcome to Study Sphere</CardTitle>
             <CardDescription className="text-muted-foreground">
               Transform any content into interactive study materials
             </CardDescription>
