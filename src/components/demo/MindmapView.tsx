@@ -199,7 +199,7 @@ const BranchNode = ({
         />
         
         {/* Content */}
-        <p className="text-sm md:text-base font-medium text-foreground/90 text-center relative z-10 leading-snug">
+        <p className="text-sm text-white font-medium text-foreground/90 text-center relative z-10 leading-snug">
           {node.label}
         </p>
 
