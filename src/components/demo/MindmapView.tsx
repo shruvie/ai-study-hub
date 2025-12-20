@@ -186,7 +186,6 @@ const BranchNode = ({
       <div className={`
         relative bg-gradient-to-br ${colorClass} 
         px-5 py-4 rounded-lg 
-        border shadow-lg
         transform transition-all duration-300
         hover:scale-105 hover:-rotate-1
         cursor-default
