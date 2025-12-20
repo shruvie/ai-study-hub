@@ -768,7 +768,7 @@ export default function Notebook() {
                   <AudioPlayer script={processedData.audioScript} />
                 </TabsContent>
                 
-                <TabsContent value="video" className="h-full m-0">
+                <TabsContent value="Slides" className="h-full m-0">
                   <VideoOverview slides={processedData.videoOutline} />
                 </TabsContent>
                 
