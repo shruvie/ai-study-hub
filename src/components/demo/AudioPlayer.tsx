@@ -73,12 +73,9 @@ const AudioPlayer = ({ script }: AudioPlayerProps) => {
   };
 
   return (
-    <div className="flex flex-col h-full">
-    {/* Script Display (SCROLLABLE) */}
-    <div
-      ref={containerRef}
-      className="flex-1 overflow-y-auto p-6 bg-white/5 rounded-xl mb-6"
-    >
+    <div className="h-full flex flex-col">
+      {/* Script Display */}
+      <div className="flex-1 overflow-auto p-6 bg-white/5 rounded-xl mb-6">
         <h3 className="text-lg font-semibold text-white mb-4">Audio Script</h3>
         <p className="text-white/70 leading-relaxed whitespace-pre-wrap">{script}</p>
       </div>
