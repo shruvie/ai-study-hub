@@ -763,10 +763,10 @@ export default function Notebook() {
                 <TabsContent value="mindmap" className="h-full m-0">
                   <MindmapView diagram={processedData.mindmap} />
                 </TabsContent>
-               <TabsContent value="audio" className="h-full m-0 overflow-auto">
-            <AudioPlayer script={processedData.audioScript} />
-            </TabsContent>
-
+                
+                <TabsContent value="audio" className="h-full m-0">
+                  <AudioPlayer script={processedData.audioScript} />
+                </TabsContent>
                 
                 <TabsContent value="video" className="h-full m-0">
                   <VideoOverview slides={processedData.videoOutline} />
