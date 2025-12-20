@@ -179,8 +179,6 @@ const BranchNode = ({
       className="relative group"
       style={{ transform: `rotate(${rotation}deg)` }}
     >
-      {/* Shadow/depth effect */}
-      <div className="absolute inset-0 rounded-lg translate-x-1 translate-y-1 blur-sm" />
       
       {/* Sticky note body */}
       <div className={`
