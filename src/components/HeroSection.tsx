@@ -33,7 +33,7 @@ const HeroSection = () => {
 
           {/* Subtext */}
           <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-10 leading-relaxed opacity-0 animate-fade-up" style={{ animationDelay: "0.3s" }}>
-            Adaptive learning, personalized study paths, and an AI notebook that understands your notes—just like NotebookLM.
+            Adaptive learning, personalized study paths, and an AI notebook that understands your notes.
           </p>
 
           {/* CTA Buttons */}
